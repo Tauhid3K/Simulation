@@ -27,7 +27,9 @@ steps = np.array([movement[direction] for direction in walk_directions])
 locations = np.vstack(([0, 0], np.cumsum(steps, axis=0)))
 
 print("Number of Steps =", number_of_steps)
-print("Final Position  =", tuple(locations[-1]))
+final_x, final_y = locations[-1]
+print("Final x =", final_x)
+print("Final y =", final_y)
 print("Distance from Origin =", round(np.linalg.norm(locations[-1]), 2))
 print("Directions =", "".join(walk_directions))
 
