@@ -1,119 +1,151 @@
 from pathlib import Path
+import random
 
 import matplotlib.pyplot as plt
-import numpy as np
 
-# Step 1: Define bearing life and mechanic-delay distributions.
-rng = np.random.default_rng(42)
-life_values = np.arange(1000, 2000, 100)
-life_probabilities = np.array([0.10, 0.14, 0.24, 0.14, 0.12, 0.10, 0.06, 0.05, 0.03, 0.02])
-delay_values = np.array([4, 6, 8])
-delay_probabilities = np.array([0.3, 0.6, 0.1])
-replacement_time = 20
-replacement_cost = 20
+# Step 1: Probability tables for bearing life and mechanic delay.
+random.seed(42)
+
+bearing_lives = [1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900]
+bearing_probabilities = [10, 14, 24, 14, 12, 10, 6, 5, 3, 2]
+delay_times = [4, 6, 8]
+delay_probabilities = [3, 6, 1]
+
+operating_hours = 20_000
+bearing_cost = 20
+replacement_minutes = 20
 delay_cost_per_minute = 5
 mechanic_cost_per_hour = 25
-operating_time = 20_000
 
-# Manual option: uncomment these lines to use question-provided values.
-# manual_bearing_lives = [1800, 1200, 1600, 1300, 1100, 1000]
-# manual_mechanic_delays = [4, 6, 8, 6]
+# Manual option: uncomment these lines and add values from the question.
+# manual_bearing_lives = [1500, 1200, 1800, 1100, 1600, 1400]
+# manual_delays = [4, 6, 8, 6]
 manual_bearing_lives = None
-manual_mechanic_delays = None
+manual_delays = None
 manual_life_index = 0
 manual_delay_index = 0
 
 
-def simulate_life() -> int:
+def get_bearing_life():
+    """Return one bearing life using the probability table."""
     global manual_life_index
     if manual_bearing_lives is not None:
-        if manual_life_index >= len(manual_bearing_lives):
-            raise ValueError("Add more manual bearing-life values for the simulation.")
+        if manual_life_index == len(manual_bearing_lives):
+            raise ValueError("Add more manual bearing-life values.")
         life = manual_bearing_lives[manual_life_index]
         manual_life_index += 1
-        return int(life)
-    return int(rng.choice(life_values, p=life_probabilities))
+        return life
+    return random.choices(bearing_lives, weights=bearing_probabilities)[0]
 
 
-def simulate_delay() -> int:
+def get_delay_time():
+    """Return one mechanic delay using the probability table."""
     global manual_delay_index
-    if manual_mechanic_delays is not None:
-        if manual_delay_index >= len(manual_mechanic_delays):
-            raise ValueError("Add more manual mechanic-delay values for the simulation.")
-        delay_value = manual_mechanic_delays[manual_delay_index]
+    if manual_delays is not None:
+        if manual_delay_index == len(manual_delays):
+            raise ValueError("Add more manual delay values.")
+        delay = manual_delays[manual_delay_index]
         manual_delay_index += 1
-        return int(delay_value)
-    return int(rng.choice(delay_values, p=delay_probabilities))
+        return delay
+    return random.choices(delay_times, weights=delay_probabilities)[0]
 
 
-def simulate_individual_bearings() -> tuple[list[int], int, int]:
-    bearing_lives = [[], [], []]
-    elapsed = [0, 0, 0]
-    while min(elapsed) < operating_time:
-        for index in range(3):
-            if elapsed[index] < operating_time:
-                life = simulate_life()
-                bearing_lives[index].append(life)
-                elapsed[index] += life
+def get_failure_history():
+    """Simulate three separate bearings until each reaches operating_hours."""
+    histories = [[], [], []]
 
-    two_down = 0
-    three_down = 0
-    for lives in zip(*bearing_lives):
-        equal_count = len(set(lives))
-        if equal_count == 1:
-            three_down += 1
-        elif equal_count == 2:
-            two_down += 1
+    for bearing_number in range(3):
+        elapsed = 0
+        while elapsed < operating_hours:
+            life = get_bearing_life()
+            histories[bearing_number].append(life)
+            elapsed += life
 
-    return [life for bearing in bearing_lives for life in bearing], two_down, three_down
+    return histories
 
 
-def calculate_cost(number_of_bearings: int, two_down: int, three_down: int) -> float:
-    mechanic_calls = number_of_bearings - two_down - 2 * three_down
-    delay_minutes = sum(simulate_delay() for _ in range(max(mechanic_calls, 0)))
-    repair_minutes = number_of_bearings * replacement_time - 10 * two_down - 20 * three_down
+def count_simultaneous_failures(histories):
+    """Count failures occurring together in the three bearing histories."""
+    two_bearings_down = 0
+    three_bearings_down = 0
+
+    common_events = min(len(history) for history in histories)
+    for event in range(common_events):
+        lives = [
+            histories[0][event],
+            histories[1][event],
+            histories[2][event],
+        ]
+        different_lives = len(set(lives))
+        if different_lives == 1:
+            three_bearings_down += 1
+        elif different_lives == 2:
+            two_bearings_down += 1
+
+    return two_bearings_down, three_bearings_down
+
+
+def calculate_old_cost(histories, two_bearings_down, three_bearings_down):
+    """Calculate cost when each bearing is replaced separately."""
+    total_bearings = sum(len(history) for history in histories)
+    mechanic_calls = total_bearings - two_bearings_down - 2 * three_bearings_down
+    total_delay = sum(get_delay_time() for _ in range(mechanic_calls))
+
+    repair_minutes = (
+        total_bearings * replacement_minutes
+        - two_bearings_down * 10
+        - three_bearings_down * 20
+    )
     return (
-        number_of_bearings * replacement_cost
-        + delay_minutes * delay_cost_per_minute
+        total_bearings * bearing_cost
+        + total_delay * delay_cost_per_minute
         + repair_minutes / 60 * mechanic_cost_per_hour
     )
 
 
-individual_lives, two_down, three_down = simulate_individual_bearings()
-old_cost = calculate_cost(len(individual_lives), two_down, three_down)
+# Step 2: Simulate the current maintenance method.
+histories = get_failure_history()
+two_down, three_down = count_simultaneous_failures(histories)
+old_cost = calculate_old_cost(histories, two_down, three_down)
 
+# Step 3: Simulate replacing all three bearings when the first one fails.
 grouped_lives = []
 grouped_delays = []
 elapsed = 0
-
-while elapsed < operating_time:
-    grouped_lives.append(min(simulate_life(), simulate_life(), simulate_life()))
-    grouped_delays.append(simulate_delay())
-    elapsed += grouped_lives[-1]
+while elapsed < operating_hours:
+    first_failure = min(get_bearing_life(), get_bearing_life(), get_bearing_life())
+    grouped_lives.append(first_failure)
+    grouped_delays.append(get_delay_time())
+    elapsed += first_failure
 
 new_cost = (
-    len(grouped_lives) * replacement_cost
+    len(grouped_lives) * bearing_cost
     + sum(grouped_delays) * delay_cost_per_minute
     + len(grouped_lives) * 40 / 60 * mechanic_cost_per_hour
 )
 
+all_lives = histories[0] + histories[1] + histories[2]
 print("Individual replacement cost =", round(old_cost, 2), "Rs.")
 print("Group replacement cost      =", round(new_cost, 2), "Rs.")
 print("Estimated saving             =", round(old_cost - new_cost, 2), "Rs.")
-print("Individual bearing failures  =", len(individual_lives))
+print("Individual bearing failures  =", len(all_lives))
 print("Grouped replacement events  =", len(grouped_lives))
 print("Two bearings down together   =", two_down)
 print("Three bearings down together =", three_down)
 
-# Step 2: Compare bearing-life distributions and replacement costs.
+# Step 4: Draw graphs.
 fig, axes = plt.subplots(1, 2, figsize=(13, 5))
-axes[0].hist(individual_lives, bins=np.arange(950, 2051, 100), color="cornflowerblue", edgecolor="black")
-axes[0].set_title("Individual Bearing Lifetimes")
-axes[0].set_xlabel("Life (hours)")
-axes[0].set_ylabel("Frequency")
+axes[0].hist(all_lives, bins=10, color="cornflowerblue", edgecolor="black")
+axes[0].set_title("Bearing Life Distribution")
+axes[0].set_xlabel("Bearing life (hours)")
+axes[0].set_ylabel("Number of failures")
 
-bars = axes[1].bar(["Individual", "Grouped"], [old_cost, new_cost], color=["indianred", "seagreen"])
-axes[1].set_title("Replacement Cost Comparison")
+bars = axes[1].bar(
+    ["Individual\nreplacement", "Group\nreplacement"],
+    [old_cost, new_cost],
+    color=["indianred", "seagreen"],
+)
+axes[1].set_title("Maintenance Cost Comparison")
 axes[1].set_ylabel("Cost (Rs.)")
 axes[1].bar_label(bars, fmt="%.2f", padding=3)
 
