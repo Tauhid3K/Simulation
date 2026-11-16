@@ -34,8 +34,8 @@ print(f"   100 numbers   -> Mean: {np.mean(nums):.4f}, Std Dev: {np.std(nums):.4
 print(f"   10,000 numbers -> Mean: {np.mean(nums_10000):.4f}, Std Dev: {np.std(nums_10000):.4f}, Min: {np.min(nums_10000):.4f}")
 print("   Observation: With 10,000 numbers, the mean approaches 0.5, std dev approaches 0.2887, and min approaches 0.")
 
-# 5. Plot every experiment in one dashboard
-fig, axes = plt.subplots(2, 3, figsize=(16, 9))
+# 5. Plot the main experiments and summary statistics in one dashboard
+fig, axes = plt.subplots(2, 2, figsize=(12, 9))
 
 axes[0, 0].hist(nums, bins=15, color="steelblue", edgecolor="black")
 axes[0, 0].axvline(np.mean(nums), color="red", linestyle="--", label=f"Mean: {np.mean(nums):.3f}")
@@ -51,13 +51,6 @@ axes[0, 1].set_xlabel("Value")
 axes[0, 1].set_ylabel("Frequency")
 axes[0, 1].legend()
 
-axes[0, 2].plot(seed_run1, color="purple", alpha=0.8, label="Seed run 1")
-axes[0, 2].plot(seed_run2, color="green", linestyle="--", alpha=0.8, label="Seed run 2")
-axes[0, 2].set_title("Same Seed: Identical Values")
-axes[0, 2].set_xlabel("Sample index")
-axes[0, 2].set_ylabel("Value")
-axes[0, 2].legend()
-
 axes[1, 0].hist(nums, bins=15, density=True, alpha=0.65, color="steelblue", label="100 numbers")
 axes[1, 0].hist(nums_10000, bins=30, density=True, alpha=0.65, color="seagreen", label="10,000 numbers")
 axes[1, 0].axvline(0.5, color="black", linestyle="--", label="Theoretical mean: 0.5")
@@ -66,22 +59,17 @@ axes[1, 0].set_xlabel("Value")
 axes[1, 0].set_ylabel("Probability density")
 axes[1, 0].legend()
 
-sample_sizes = np.arange(1, len(nums_10000) + 1)
-running_means = np.cumsum(nums_10000) / sample_sizes
-axes[1, 1].plot(sample_sizes, running_means, color="seagreen")
-axes[1, 1].axhline(0.5, color="red", linestyle="--", label="Theoretical mean: 0.5")
-axes[1, 1].set_title("Mean Convergence")
-axes[1, 1].set_xlabel("Number of samples")
-axes[1, 1].set_ylabel("Running mean")
-axes[1, 1].legend()
-
 summary_labels = ["100 mean", "10,000 mean", "100 std", "10,000 std"]
 summary_values = [np.mean(nums), np.mean(nums_10000), np.std(nums), np.std(nums_10000)]
-bars = axes[1, 2].bar(summary_labels, summary_values, color=["steelblue", "seagreen", "cornflowerblue", "mediumseagreen"])
-axes[1, 2].set_title("Summary Statistics")
-axes[1, 2].set_ylabel("Value")
-axes[1, 2].tick_params(axis="x", rotation=25)
-axes[1, 2].bar_label(bars, fmt="%.3f", padding=3)
+bars = axes[1, 1].bar(
+    summary_labels,
+    summary_values,
+    color=["steelblue", "seagreen", "cornflowerblue", "mediumseagreen"],
+)
+axes[1, 1].set_title("Summary Statistics")
+axes[1, 1].set_ylabel("Value")
+axes[1, 1].tick_params(axis="x", rotation=25)
+axes[1, 1].bar_label(bars, fmt="%.3f", padding=3)
 
 fig.suptitle("Random Number Experiments", fontsize=16)
 fig.tight_layout()
